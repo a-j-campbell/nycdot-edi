@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <!-- Responsive -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <link rel="stylesheet" href="https://js.arcgis.com/4.14/esri/css/main.css">
+    <script src="https://js.arcgis.com/4.16/"></script>
+    <script src="https://survey123.arcgis.com/api/jsapi"></script>
+    <title></title>
+    <style>
+        html,
+        body,
+        #survey123-webform {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="survey123-webform"></div>
+    <script>
+        require(["esri/tasks/QueryTask", "esri/tasks/support/Query", "esri/identity/IdentityManager"], 
+        function(QueryTask, Query, IdentityManager) {
+            // Information about service for FSE validation
+            var pms_svc_url = "https://services.arcgis.com/wmZOI9vyUBq1zTZx/arcgis/rest/services/Employee_LUT/FeatureServer/0"
+            var pms_svc_column = "*"
+            var pms_svc_filter = "1=1"
+            // Information about the form
+            var pms_form_field = "pms_number"
+            var pmsvalidation_field_valid = {'pmsNumberValidation':'Valid'}    // field to be updated, and value to set it to, if fse passes validation
+            var pmsvalidation_field_invalid = {'pmsNumberValidation':'Invalid'} // field to be updated, and value to set it to, if fse fails validation
+            // ================================================================================
+
+			// Query to get list of all possible FSE values.
+            var pmsQueryTask = new QueryTask({
+                url: pms_svc_url
+            });
+            var pmsquery = new Query();
+            var pms_features = {};
+            pmsquery.returnGeometry = false;
+            pmsquery.outFields = [pms_svc_column];
+            pmsquery.where = pms_svc_filter;
+
+            pms_list = []
+            
+            pmsQueryTask.execute(pmsquery).then(function(list){
+
+                len = list.features.length
+                console.info("PMS list queried. Features queried: " + len)
+
+                for (i = 0; i < len; i++){
+                    pms_no = list.features[i].attributes['PMS']
+                    pms_list.push(pms_no)
+                }
+
+                const survey123WebForm = new Survey123WebForm({
+                    container: "survey123-webform",
+                    clientId: "kC3LdPudTY67vLfd",
+                    portalUrl: "https://nycdot.maps.arcgis.com",
+                    itemId: "75dd44e6927c4385a8dfe252548eca6d",
+                    hideElements: "header",
+                    onQuestionValueChanged: (v) => {
+                        // Event handler is called on any value change in any field. We are trying
+                        // to minimize the calls to bids.indexOf() and .setQuetionValue - that is why 
+                        // is_valid is maintained
+                        if (v.field == pms_form_field) {
+                            if (v.value.length >= 3){
+                                if (pms_list.indexOf(v.value) >= 0) {
+                                    console.info("PMS Number is valid.")
+                                    console.info("Employee Info: " + v.value)
+
+                                    survey123WebForm.setQuestionValue(fsevalidation_field_valid)
+                                    survey123WebForm.setQuestionValue({'restaurantName' : pms_features[v.value]['restaurantName']})
+                                    survey123WebForm.setQuestionValue({'bizName' : pms_features[v.value]['bizName']})
+                                    survey123WebForm.setQuestionValue({'bizDBA' : pms_features[v.value]['bizName']})
+                                    survey123WebForm.setQuestionValue({'bizBldgNum' : pms_features[v.value]['bizBldgNum']})
+                                    survey123WebForm.setQuestionValue({'bizStreetName' : pms_features[v.value]['bizStreetName']})
+                                    survey123WebForm.setQuestionValue({'bizBoro' : pms_features[v.value]['bizBoro']})
+                                    survey123WebForm.setQuestionValue({'bizZip' : pms_features[v.value]['bizZip']})
+
+                                } else {
+                                    console.info("FSE Number is not valid.")
+                                    survey123WebForm.setQuestionValue(fsevalidation_field_invalid)
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+			
+        });
+    </script>
+</body>
+</html>
